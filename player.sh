@@ -34,7 +34,7 @@ done <<< "$PLAYLISTS"
 ##### USER INPUT LOGIC #####
 
 # Display the playlist in Rofi and retrieve the selected playlist
-SELECTED_PLAYLIST=$(echo -e "$FORMATTED_PLAYLISTS" | head -n -1 | rofi -dmenu -i -p "Select a playlist" | awk '{print $1}')
+SELECTED_PLAYLIST=$(echo -e "$FORMATTED_PLAYLISTS" | head -n -1 | rofi -dmenu -i -p "Select a playlist" | awk '{$NF=""; print substr($0, 1, length($0)-1)}')
 
 # If "Exit" is selected, terminate the job
 if [ "$SELECTED_PLAYLIST" == "Exit" ]; then
@@ -55,8 +55,11 @@ killall mpv
 # Get the list of tracks in the playlist
 # INPUT:  Music directory
 # OUTPUT: List of tracks
-TRACKS=$(find ~/Music/"$SELECTED_PLAYLIST" -maxdepth 1 -type f \( -iname "*.mp3" -o -iname "*.flac" -o -iname "*.wav" -o -iname "*.m4a" \))
-
+if [ "$SELECTED_PLAYLIST" == "Music" ]; then
+    TRACKS=$(find ~/Music -type f \( -iname "*.mp3" -o -iname "*.flac" -o -iname "*.wav" -o -iname "*.m4a" \))
+else
+    TRACKS=$(find ~/Music/"$SELECTED_PLAYLIST" -maxdepth 1 -type f \( -iname "*.mp3" -o -iname "*.flac" -o -iname "*.wav" -o -iname "*.m4a" \))
+fi
 # Create a temporary playlist file
 PLAYLIST=$(mktemp)
 
