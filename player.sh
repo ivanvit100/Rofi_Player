@@ -36,21 +36,16 @@ done <<< "$PLAYLISTS"
 # Display the playlist in Rofi and retrieve the selected playlist
 SELECTED_PLAYLIST=$(echo -e "$FORMATTED_PLAYLISTS" | head -n -1 | rofi -dmenu -i -p "Select a playlist" | awk '{$NF=""; print substr($0, 1, length($0)-1)}')
 
-# If "Exit" is selected, terminate the job
-if [ "$SELECTED_PLAYLIST" == "Exit" ]; then
-    killall mpv
-    exit 0
-fi
-
 # If no playlist is selected, exit
 if [ -z "$SELECTED_PLAYLIST" ]; then
+    pkill -f "$SCRIPT_NAME"
     exit 0
 fi
 
 ##### PLAYLIST PLAYBACK #####
 
 # Kill previously opened playlists 
-killall mpv
+pkill -f "$SCRIPT_NAME"
 
 # Get the list of tracks in the playlist
 # INPUT:  Music directory
@@ -58,7 +53,7 @@ killall mpv
 if [ "$SELECTED_PLAYLIST" == "Music" ]; then
     TRACKS=$(find ~/Music -type f \( -iname "*.mp3" -o -iname "*.flac" -o -iname "*.wav" -o -iname "*.m4a" \))
 else
-    TRACKS=$(find ~/Music/"$SELECTED_PLAYLIST" -maxdepth 1 -type f \( -iname "*.mp3" -o -iname "*.flac" -o -iname "*.wav" -o -iname "*.m4a" \))
+    TRACKS=$(find ~/Music/"$SELECTED_PLAYLIST" -type f \( -iname "*.mp3" -o -iname "*.flac" -o -iname "*.wav" -o -iname "*.m4a" \))
 fi
 # Create a temporary playlist file
 PLAYLIST=$(mktemp)
@@ -67,7 +62,7 @@ PLAYLIST=$(mktemp)
 echo "$TRACKS" | shuf > "$PLAYLIST"
 
 # Play the playlist without the application window
-mpv --no-video --playlist="$PLAYLIST"
+mpv --no-video --playlist="$PLAYLIST" --title="$SCRIPT_NAME"
 
 # Delete the temporary playlist file
 rm "$PLAYLIST"
