@@ -10,14 +10,19 @@ It uses mpv to play music and mpv-mpris to support `MPRIS`.
 3. Allows you to select a playlist to play.
 4. Plays the selected playlist in random order.
 5. Allows you to stop playback and exit the player.
+6. Allows to play YouTube playlist directly or by downloading
+7. Managing playlists
 
 ## Dependensies
-1. `Rofi`
-2. `MPV`
-3. `mpv-mpris` plugin
+1. `Rofi`      ^ 
+2. `MPV`       ^ v0.37.0
+3. `mpv-mpris` ^ 
+4. `jq`        ^ jq-1.7.1
+5. `yt-dlp`    ^ 2024.03.10
 
 ## Flags
 1. `--offset` It allows you to set the indentation size to the number of songs in the directory
+2. `--json_file` Custom way to YT playlists JSON
 
 ## Using
 1. Make sure you have `rofi`, `mpv` and `mpv-mpris` installed.
@@ -30,4 +35,10 @@ chmod +x
 ```sh
 bind = $mainMod, Y, exec, pkill -x rofi || $scrPath/player.sh --offset=25 # open player
 ```
-5. In the Rofi window that opens, select a playlist to play or select "Exit" to exit.
+5. In the Rofi window that opens, select a playlist to play.
+
+#### More functions
+1. `From YouTube` is allows you to enter a URL on playlist, which will be played and saved in json
+2. `Save YouTube` is allows you to enter a URL on playlist, which will be played and downloaded as mp3
+3. `Delete` is running menu to delete playlist
+4. `Exit` is kill player

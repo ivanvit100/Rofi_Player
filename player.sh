@@ -1,19 +1,35 @@
 #!/bin/bash
 
+##### ABOUT #####
+
 # Description: Main player file,
 # which starts in Rofi config file
 # Using mpv-mpris for play music
 # Developer: ivanvit100 @ GitHub
 
-# Flags:
-# --offset={{num}} - additional offset for numbers in menu
+##### DEPENDENSIES #####
+# mpv       ^ v0.37.0
+# mpv-mpris ^ 
+# jq        ^ jq-1.7.1
+# yt-dlp    ^ 2024.03.10
+# Rofi      ^ 
+
+##### FLAGS #####
+# --offset={{num}}      - additional offset for numbers in menu
+# --json_file={{way}}   - custom way to YT playlists JSON
+
+#####       #####
+
+
+##### VARIABLES #####
 
 SCRIPT_NAME="Rofi Player"
 OFFSET=${1#*=}
 JSON_FILE=${2#*=}
 YT_LISTS=()
 
-# If offset is not provided, set it to default value
+##### SETTING DEFAULT VALUES #####
+
 if [ -z "$OFFSET" ]; then
     OFFSET="20"
 fi
@@ -31,7 +47,10 @@ MAX_LENGTH=$(echo -e "$PLAYLISTS" | cut -f1 | awk '{ if (length > max) max = len
 
 ##### YT READING PART #####
 
-mapfile -t YT_LISTS < <(jq -r '"\(.name)\t\(.url)"' "$JSON_FILE")
+while IFS= read -r line; do
+    YT_LISTS+=("$line")
+done < <(jq -c '.[]' "$JSON_FILE" | while read i; do jq -r '"\(.name)\t\(.url)"' <<< "$i"; done)
+
 for playlist in "${YT_LISTS[@]}"; do
     name=$(echo -e "$playlist" | cut -f1)
     PLAYLISTS+=$'\n'"$name" 
@@ -41,16 +60,17 @@ PLAYLISTS+=$'\n'"From YouTube"
 PLAYLISTS+=$'\n'"Exit"
 FORMATTED_PLAYLISTS=""
 while IFS=$'\t' read -r name count; do
+    if [ -z "$count" ] && [ "$name" != "From YouTube" ] && [ "$name" != "Exit" ]; then
+    count="YT"
+fi
     SPACES=$((MAX_LENGTH - ${#name} + 5))
     FORMATTED_PLAYLISTS+="$name$(printf '%*s' $SPACES)$count\n"
 done <<< "$PLAYLISTS"
 
-##### USER INPUT LOGIC #####
+##### USER MENU LOGIC #####
 
-# Display the playlist in Rofi and retrieve the selected playlist
 SELECTED_PLAYLIST=$(echo -e "$FORMATTED_PLAYLISTS" | head -n -1 | rofi -dmenu -i -p "Select a playlist" | awk '{$NF=""; print substr($0, 1, length($0)-1)}')
 
-# If no playlist is selected, exit
 if [ -z "$SELECTED_PLAYLIST" ]; then
     pkill -f "$SCRIPT_NAME"
     exit 0
@@ -59,11 +79,13 @@ fi
 ##### YT playback #####
 
 YT(){
-    PLAYLIST_NAME=$(yt-dlp --flat-playlist -e -j "$1" | head -1)
-    echo "$PLAYLIST_NAME"
+    PLAYLIST_NAME=$(yt-dlp --flat-playlist -e -j "$1" | sed -z 's/{.*//')
+    URL=$(jq -r --arg name "$1" '.[] | select(.name == $name) | .url' "$JSON_FILE")
     if [ $? -eq 0 ] && [ "$PLAYLIST_NAME" != "Error" ]; then
-        if ! jq --arg url "$1" 'any(.[]; .url == $url)' "$JSON_FILE"; then
-            jq --arg url "$1" --arg name "$PLAYLIST_NAME" 'if type=="array" then . += [{"url": $url, "name": $name}] else [{"url": $url, "name": $name}] end' "$JSON_FILE" > temp.json && mv temp.json "$JSON_FILE"
+        if [ "$URL" == "" ]; then
+            head -c -1 "$JSON_FILE" > temp.json
+            echo ",{\"url\": \"$1\", \"name\": \"$PLAYLIST_NAME\"}]" >> temp.json
+            mv temp.json "$JSON_FILE"
         fi
         mpv --no-video --ytdl-format=bestaudio "$1" --title="$SCRIPT_NAME"
     else
@@ -75,9 +97,6 @@ YT(){
 
 if [ "$SELECTED_PLAYLIST" == "From" ]; then
     YOUTUBE_PLAYLIST_URL=$(rofi -dmenu -p "Enter YouTube playlist URL")
-    if [ -z $YOUTUBE_PLAYLIST_URL ]; then
-        exit 0
-    fi
     YT $YOUTUBE_PLAYLIST_URL
 fi
 
@@ -91,22 +110,21 @@ playlist(){
         TRACKS=$(find ~/Music/"$SELECTED_PLAYLIST" -type f \( -iname "*.mp3" -o -iname "*.flac" -o -iname "*.wav" -o -iname "*.m4a" \))
     fi
     PLAYLIST=$(mktemp)
-
-    # Record tracks into a playlist in random order
     echo "$TRACKS" | shuf > "$PLAYLIST"
-
-    # Play the playlist without the application window
     mpv --no-video --playlist="$PLAYLIST" --title="$SCRIPT_NAME"
-
-    # Delete the temporary playlist file
     rm "$PLAYLIST"
 }
 
+##### FIND IN JSON #####
+
 get_url_by_name() {
-    echo $(jq -r --arg name "$1" '.[] | select(.name == $name) | .url' "$JSON_FILE")
+    if [[ "$1" =~ ^https://www\.youtube\.com/.*$ ]]; then
+        echo $URL
+    fi
 }
 
-# Usage
+##### USAGE #####
+
 url=$(get_url_by_name $SELECTED_PLAYLIST)
 if [ -z "$url" ]; then
     playlist
