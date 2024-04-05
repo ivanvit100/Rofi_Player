@@ -1,5 +1,7 @@
 #!/bin/bash
 
+set -x
+
 ##### ABOUT #####
 
 # Description: Main player file,
@@ -57,12 +59,13 @@ for playlist in "${YT_LISTS[@]}"; do
 done
 
 PLAYLISTS+=$'\n'"From YouTube"
+PLAYLISTS+=$'\n'"Save YouTube"
 PLAYLISTS+=$'\n'"Exit"
 FORMATTED_PLAYLISTS=""
 while IFS=$'\t' read -r name count; do
-    if [ -z "$count" ] && [ "$name" != "From YouTube" ] && [ "$name" != "Exit" ]; then
-    count="YT"
-fi
+    if [ -z "$count" ] && [ "$name" != "From YouTube" ] && [ "$name" != "Exit" ] && [ "$name" != "Save YouTube" ]; then
+        count="YT"
+    fi
     SPACES=$((MAX_LENGTH - ${#name} + 5))
     FORMATTED_PLAYLISTS+="$name$(printf '%*s' $SPACES)$count\n"
 done <<< "$PLAYLISTS"
@@ -76,7 +79,7 @@ if [ -z "$SELECTED_PLAYLIST" ]; then
     exit 0
 fi
 
-##### YT playback #####
+##### YOUTUBE PLAYLIST ADDITION #####
 
 YT(){
     PLAYLIST_NAME=$(yt-dlp --flat-playlist -e -j "$1" | sed -z 's/{.*//')
@@ -93,11 +96,25 @@ YT(){
     fi
 }
 
-##### YOUTUBE PLAYLIST ADDITION #####
-
 if [ "$SELECTED_PLAYLIST" == "From" ]; then
     YOUTUBE_PLAYLIST_URL=$(rofi -dmenu -p "Enter YouTube playlist URL")
     YT $YOUTUBE_PLAYLIST_URL
+fi
+
+##### YOUTUBE PLAYLIST DOWNLOAD #####
+
+YT_SAVE(){
+    PLAYLIST_NAME=$(yt-dlp --flat-playlist -e -j "$1" | sed -z 's/{.*//')
+    dir=$HOME/Music/$(echo $PLAYLIST_NAME | cut -d' ' -f1)
+    mkdir -p $dir
+    cd $dir
+    yt-dlp -x --audio-format mp3 $1
+    SELECTED_PLAYLIST="Save"
+}
+
+if [ "$SELECTED_PLAYLIST" == "Save" ]; then
+    YOUTUBE_PLAYLIST_URL=$(rofi -dmenu -p "Enter YouTube playlist URL")
+    YT_SAVE $YOUTUBE_PLAYLIST_URL
 fi
 
 ##### PLAYLIST PLAYBACK #####
