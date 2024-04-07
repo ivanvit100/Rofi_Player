@@ -29,6 +29,8 @@ SCRIPT_NAME="Rofi Player"
 OFFSET=${1#*=}
 JSON_FILE=${2#*=}
 YT_LISTS=()
+FORMATTED_PLAYLISTS=""
+PLAYLISTS=""
 
 ##### SETTING DEFAULT VALUES #####
 
@@ -42,33 +44,43 @@ if [ ! -f "$JSON_FILE" ] || [ ! -s "$JSON_FILE" ]; then
     echo "[  ]" > "$JSON_FILE"
 fi
 
-##### LOCAL READING PART #####
+##### PLAYLITS FORMING #####
 
-PLAYLISTS=$(find ~/Music -maxdepth 1 -type d -exec bash -c 'echo -e "$(basename "{}")\t$(find "{}" -type f \( -iname "*.mp3" -o -iname "*.flac" -o -iname "*.wav" -o -iname "*.m4a" \) | wc -l)"' \;)
-MAX_LENGTH=$(echo -e "$PLAYLISTS" | cut -f1 | awk '{ if (length > max) max = length + '$OFFSET'} END { print max }')
+FORMING(){
 
-##### YT READING PART #####
+    ##### LOCAL READING PART #####
+    
+    PLAYLISTS=$(find ~/Music -maxdepth 1 -type d -exec bash -c 'echo -e "$(basename "{}")\t$(find "{}" -type f \( -iname "*.mp3" -o -iname "*.flac" -o -iname "*.wav" -o -iname "*.m4a" \) | wc -l)"' \;)
+    MAX_LENGTH=$(echo -e "$PLAYLISTS" | cut -f1 | awk '{ if (length > max) max = length + '$OFFSET'} END { print max }')
 
-while IFS= read -r line; do
-    YT_LISTS+=("$line")
-done < <(jq -c '.[]' "$JSON_FILE" | while read i; do jq -r '"\(.name)\t\(.url)"' <<< "$i"; done)
+    ##### YT READING PART #####
 
-for playlist in "${YT_LISTS[@]}"; do
-    name=$(echo -e "$playlist" | cut -f1)
-    PLAYLISTS+=$'\n'"$name" 
-done
+    while IFS= read -r line; do
+        YT_LISTS+=("$line")
+    done < <(jq -c '.[]' "$JSON_FILE" | while read i; do jq -r '"\(.name)\t\(.url)"' <<< "$i"; done)
 
+    for playlist in "${YT_LISTS[@]}"; do
+        name=$(echo -e "$playlist" | cut -f1)
+        PLAYLISTS+=$'\n'"$name" 
+    done
+}
+
+FORMATING(){
+    while IFS=$'\t' read -r name count; do
+        if [ -z "$count" ] && [ "$name" != "From YouTube" ] && [ "$name" != "Exit" ] && [ "$name" != "Save YouTube" ] && [ "$name" != "Delete list" ]; then
+            count="YT"
+        fi
+        SPACES=$((MAX_LENGTH - ${#name} + 5))
+        FORMATTED_PLAYLISTS+="$name$(printf '%*s' $SPACES)$count\n"
+    done <<< "$PLAYLISTS"
+}
+
+FORMING
 PLAYLISTS+=$'\n'"From YouTube"
 PLAYLISTS+=$'\n'"Save YouTube"
+PLAYLISTS+=$'\n'"Delete list"
 PLAYLISTS+=$'\n'"Exit"
-FORMATTED_PLAYLISTS=""
-while IFS=$'\t' read -r name count; do
-    if [ -z "$count" ] && [ "$name" != "From YouTube" ] && [ "$name" != "Exit" ] && [ "$name" != "Save YouTube" ]; then
-        count="YT"
-    fi
-    SPACES=$((MAX_LENGTH - ${#name} + 5))
-    FORMATTED_PLAYLISTS+="$name$(printf '%*s' $SPACES)$count\n"
-done <<< "$PLAYLISTS"
+FORMATING
 
 ##### USER MENU LOGIC #####
 
@@ -139,6 +151,29 @@ get_url_by_name() {
         echo $URL
     fi
 }
+
+##### DELETE PLAYLIST #####
+
+DELETE() {
+    if [ -z "$1" ]; then
+        exit 0
+    fi
+    dir=~/Music/$1
+    if [ -d "$dir" ]; then
+        rm -rf "$dir"
+    else
+        jq -c "map(select(.name != \"$1\"))" $JSON_FILE > temp.json && mv temp.json $JSON_FILE
+    fi
+}
+
+if [ "$SELECTED_PLAYLIST" == "Delete" ]; then
+    FORMING
+    FORMATTED_PLAYLISTS=""
+    PLAYLISTS+=$'\n'"Exit"
+    FORMATING
+    SELECTED_PLAYLIST=$(echo -e "$FORMATTED_PLAYLISTS" | head -n -1 | rofi -dmenu -i -p "Select a playlist" | awk '{$NF=""; print substr($0, 1, length($0)-1)}')
+    DELETE $SELECTED_PLAYLIST
+fi
 
 ##### USAGE #####
 
