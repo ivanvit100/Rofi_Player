@@ -149,6 +149,8 @@ playlist(){
 get_url_by_name() {
     if [[ "$1" =~ ^https://www\.youtube\.com/.*$ ]]; then
         echo $URL
+    else
+        echo $(jq -r --arg name "$1" '.[] | select(.name == $name) | .url' "$JSON_FILE")
     fi
 }
 
