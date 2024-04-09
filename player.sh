@@ -97,9 +97,9 @@ YT(){
     PLAYLIST_NAME=$(yt-dlp --flat-playlist -e -j "$1" | sed -z 's/{.*//')
     URL=$(jq -r --arg name "$1" '.[] | select(.name == $name) | .url' "$JSON_FILE")
     if [ $? -eq 0 ] && [ "$PLAYLIST_NAME" != "Error" ]; then
-        if [ "$URL" == "" ]; then
-            head -c -1 "$JSON_FILE" > temp.json
-            echo ",{\"url\": \"$1\", \"name\": \"$PLAYLIST_NAME\"}]" >> temp.json
+        if ! grep -q "$1" "$JSON_FILE" ; then
+            sed 's/].*$//' "$JSON_FILE" > temp.json
+            echo ",{\"name\": \"$PLAYLIST_NAME\", \"url\": \"$1\"}]" >> temp.json
             mv temp.json "$JSON_FILE"
         fi
         mpv --no-video --ytdl-format=bestaudio "$1" --title="$SCRIPT_NAME"
