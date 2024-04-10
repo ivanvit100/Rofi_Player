@@ -14,15 +14,17 @@ It uses mpv to play music and mpv-mpris to support `MPRIS`.
 7. Managing playlists
 
 ## Dependensies
-1. `Rofi`      ^ 
-2. `MPV`       ^ v0.37.0
-3. `mpv-mpris` ^ 
-4. `jq`        ^ jq-1.7.1
-5. `yt-dlp`    ^ 2024.03.10
+1. `Rofi`      		^ 
+2. `MPV`       		^ v0.37.0
+3. `mpv-mpris` 		^ 
+4. `jq`        		^ jq-1.7.1
+5. `yt-dlp`    		^ 2024.03.10
+6. `notify-send`	^ 0.8.3
 
 ## Flags
 1. `--offset` It allows you to set the indentation size to the number of songs in the directory
 2. `--json_file` Custom way to YT playlists JSON
+3. `--logo` Custom way to logo for notify-send
 
 ## Using
 1. Make sure you have `rofi`, `mpv` and `mpv-mpris` installed.

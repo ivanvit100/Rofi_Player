@@ -10,11 +10,12 @@ set -x
 # Developer: ivanvit100 @ GitHub
 
 ##### DEPENDENSIES #####
-# mpv       ^ v0.37.0
-# mpv-mpris ^ 
-# jq        ^ jq-1.7.1
-# yt-dlp    ^ 2024.03.10
-# Rofi      ^ 
+# mpv           ^ v0.37.0
+# mpv-mpris     ^ 
+# jq            ^ jq-1.7.1
+# yt-dlp        ^ 2024.03.10
+# Rofi          ^ 
+# notify-send   ^ 0.8.3
 
 ##### FLAGS #####
 # --offset={{num}}      - additional offset for numbers in menu
@@ -94,6 +95,7 @@ fi
 ##### YOUTUBE PLAYLIST ADDITION #####
 
 YT(){
+    pkill -f "$SCRIPT_NAME"
     PLAYLIST_NAME=$(yt-dlp --flat-playlist -e -j "$1" | sed -z 's/{.*//')
     URL=$(jq -r --arg name "$1" '.[] | select(.name == $name) | .url' "$JSON_FILE")
     if [ $? -eq 0 ] && [ "$PLAYLIST_NAME" != "Error" ]; then
@@ -102,6 +104,7 @@ YT(){
             echo ",{\"name\": \"$PLAYLIST_NAME\", \"url\": \"$1\"}]" >> temp.json
             mv temp.json "$JSON_FILE"
         fi
+        notify-send --app-name=$SCRIPT_NAME --icon=$HOME/Music/player.png "Starting.."
         mpv --no-video --ytdl-format=bestaudio "$1" --title="$SCRIPT_NAME"
     else
         return 1
@@ -116,12 +119,14 @@ fi
 ##### YOUTUBE PLAYLIST DOWNLOAD #####
 
 YT_SAVE(){
+    notify-send --app-name=$SCRIPT_NAME --icon=$HOME/Music/player.png "Downloading playlist..."
     PLAYLIST_NAME=$(yt-dlp --flat-playlist -e -j "$1" | sed -z 's/{.*//')
     dir=$HOME/Music/$(echo $PLAYLIST_NAME | cut -d' ' -f1)
     mkdir -p $dir
     cd $dir
     yt-dlp -x --audio-format mp3 $1
-    SELECTED_PLAYLIST="Save"
+    SELECTED_PLAYLIST=$(echo $PLAYLIST_NAME | cut -d' ' -f1)
+    notify-send --app-name=$SCRIPT_NAME --icon=$HOME/Music/player.png "Save completed"
 }
 
 if [ "$SELECTED_PLAYLIST" == "Save" ]; then
@@ -133,6 +138,7 @@ fi
 
 playlist(){ 
     pkill -f "$SCRIPT_NAME"
+    notify-send --app-name=$SCRIPT_NAME --icon=$HOME/Music/player.png "$SELECTED_PLAYLIST"
     if [ "$SELECTED_PLAYLIST" == "Music" ]; then
         TRACKS=$(find ~/Music -type f \( -iname "*.mp3" -o -iname "*.flac" -o -iname "*.wav" -o -iname "*.m4a" \))
     else
