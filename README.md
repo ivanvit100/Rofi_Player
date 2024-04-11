@@ -20,14 +20,17 @@ It uses mpv to play music and mpv-mpris to support `MPRIS`.
 4. `jq`        		^ jq-1.7.1
 5. `yt-dlp`    		^ 2024.03.10
 6. `notify-send`	^ 0.8.3
+7. `socat`			^ 1.8.0.0
+8. `ffmpeg`			^ n6.1.1
 
 ## Flags
 1. `--offset` It allows you to set the indentation size to the number of songs in the directory
 2. `--json_file` Custom way to YT playlists JSON
-3. `--logo` Custom way to logo for notify-send
+3. `--icon={{way}}` Custom way to notify-send icon
+4. `--notify{{boolean}}` Enable/disable notification
 
 ## Using
-1. Make sure you have `rofi`, `mpv` and `mpv-mpris` installed.
+1. Make sure you have all dependensies installed.
 2. Copy the script to a convenient location.
 3. Give the script execute permissions
 ```sh

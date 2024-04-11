@@ -1,7 +1,5 @@
 #!/bin/bash
 
-set -x
-
 ##### ABOUT #####
 
 # Description: Main player file,
@@ -16,27 +14,40 @@ set -x
 # yt-dlp        ^ 2024.03.10
 # Rofi          ^ 
 # notify-send   ^ 0.8.3
+# socat         ^ 1.8.0.0
+# ffmpeg        ^ n6.1.1
 
 ##### FLAGS #####
 # --offset={{num}}      - additional offset for numbers in menu
 # --json_file={{way}}   - custom way to YT playlists JSON
+# --icon={{way}}        - custom way to notify-send icon
+# --notify{{boolean}}   - enable/disable notification
 
 #####       #####
 
 
 ##### VARIABLES #####
 
-SCRIPT_NAME="Rofi Player"
+SCRIPT_NAME="Rofi_Player"
 OFFSET=${1#*=}
 JSON_FILE=${2#*=}
 YT_LISTS=()
 FORMATTED_PLAYLISTS=""
 PLAYLISTS=""
+icon=${3#*=}
+notify=${4#*=}
+ipc_path="/tmp/mpv-socket-$(date +%s)"
 
 ##### SETTING DEFAULT VALUES #####
 
 if [ -z "$OFFSET" ]; then
     OFFSET="20"
+fi
+if [ -z "$notify" ]; then
+    notify=true
+fi
+if [ -z "$icon" ]; then
+    icon="$HOME/Music/logo.png"
 fi
 if [ -z "$JSON_FILE" ]; then
     JSON_FILE="$HOME/Music/youtube_playlists.json"
@@ -104,8 +115,8 @@ YT(){
             echo ",{\"name\": \"$PLAYLIST_NAME\", \"url\": \"$1\"}]" >> temp.json
             mv temp.json "$JSON_FILE"
         fi
-        notify-send --app-name=$SCRIPT_NAME --icon=$HOME/Music/player.png "Starting.."
-        mpv --no-video --ytdl-format=bestaudio "$1" --title="$SCRIPT_NAME"
+        notify-send --app-name=$SCRIPT_NAME --icon=$HOME/Music/logo.png "Starting.."
+        mpv --no-video --ytdl-format=bestaudio --ytdl-raw-options=yes-playlist= "$1" --title="$SCRIPT_NAME" --idle --input-ipc-server="$ipc_path" &
     else
         return 1
     fi
@@ -119,14 +130,14 @@ fi
 ##### YOUTUBE PLAYLIST DOWNLOAD #####
 
 YT_SAVE(){
-    notify-send --app-name=$SCRIPT_NAME --icon=$HOME/Music/player.png "Downloading playlist..."
+    notify-send --app-name=$SCRIPT_NAME --icon=$HOME/Music/logo.png "Downloading playlist..."
     PLAYLIST_NAME=$(yt-dlp --flat-playlist -e -j "$1" | sed -z 's/{.*//')
     dir=$HOME/Music/$(echo $PLAYLIST_NAME | cut -d' ' -f1)
     mkdir -p $dir
     cd $dir
     yt-dlp -x --audio-format mp3 $1
     SELECTED_PLAYLIST=$(echo $PLAYLIST_NAME | cut -d' ' -f1)
-    notify-send --app-name=$SCRIPT_NAME --icon=$HOME/Music/player.png "Save completed"
+    notify-send --app-name=$SCRIPT_NAME --icon=$HOME/Music/logo.png "Save completed"
 }
 
 if [ "$SELECTED_PLAYLIST" == "Save" ]; then
@@ -138,7 +149,6 @@ fi
 
 playlist(){ 
     pkill -f "$SCRIPT_NAME"
-    notify-send --app-name=$SCRIPT_NAME --icon=$HOME/Music/player.png "$SELECTED_PLAYLIST"
     if [ "$SELECTED_PLAYLIST" == "Music" ]; then
         TRACKS=$(find ~/Music -type f \( -iname "*.mp3" -o -iname "*.flac" -o -iname "*.wav" -o -iname "*.m4a" \))
     else
@@ -146,8 +156,7 @@ playlist(){
     fi
     PLAYLIST=$(mktemp)
     echo "$TRACKS" | shuf > "$PLAYLIST"
-    mpv --no-video --playlist="$PLAYLIST" --title="$SCRIPT_NAME"
-    rm "$PLAYLIST"
+    mpv --no-video --playlist="$PLAYLIST" --title="$SCRIPT_NAME" --idle --input-ipc-server="$ipc_path" &
 }
 
 ##### FIND IN JSON #####
@@ -185,9 +194,46 @@ fi
 
 ##### USAGE #####
 
+trap "rm -f $ipc_path; rm -f $PLAYLIST" TERM INT EXIT
+
 url=$(get_url_by_name $SELECTED_PLAYLIST)
 if [ -z "$url" ]; then
     playlist
 else
     YT "$url"
 fi
+
+while [ -e "/proc/$!" ] && [ "$notify" ]; do
+    current_file=$(echo '{ "command": ["get_property", "path"] }' | socat - "$ipc_path" | jq -r '.data')
+    if [ "$current_file" != "$previous_file" ]; then
+        metadata=$(echo '{ "command": ["get_property", "metadata"] }' | socat - "$ipc_path" | jq -r '.data')
+        title=$(echo "$metadata" | jq -r '."title"')
+        artist=$(echo "$metadata" | jq -r '."artist"')
+        if [ "$title" == null ]; then
+            title=$(echo '{ "command": ["get_property", "media-title"] }' | socat - "$ipc_path" | jq -r '.data')
+            if [ "$title" == null ]; then
+                title=$(basename $current_file)
+            fi
+        fi
+        if [[ "$title" =~ "playlist?" ]]; then
+            continue
+        fi
+        if [ "$artist" == null ]; then
+            artist="$SCRIPT_NAME"
+        fi
+        if [[ $current_file =~ ^/ ]]; then
+            ffmpeg -i "$current_file" -an -codec:v copy /tmp/rofi_player_cover.jpg
+            file_type=$(file --mime-type -b "/tmp/rofi_player_cover.jpg")
+            if [[ $file_type == image/* ]]; then
+                notify-send --app-name="$artist" --icon=/tmp/rofi_player_cover.jpg "$title"
+            else
+                notify-send --app-name="$artist" --icon="$icon" "$title"
+            fi
+        else
+            notify-send --app-name="$artist" --icon="$icon" "$title"
+        fi
+        previous_file=$current_file
+    fi
+    rm -f /tmp/rofi_player_cover.jpg
+    sleep 1
+done
