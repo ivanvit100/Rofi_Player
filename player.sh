@@ -1,5 +1,7 @@
 #!/bin/bash
 
+set -x
+
 ##### ABOUT #####
 
 # Description: Main player file,
@@ -21,7 +23,8 @@
 # --offset={{num}}      - additional offset for numbers in menu
 # --json_file={{way}}   - custom way to YT playlists JSON
 # --icon={{way}}        - custom way to notify-send icon
-# --notify{{boolean}}   - enable/disable notification
+# --notify={{boolean}}  - enable/disable notification
+# --np={{way}}          - custom way to support script
 
 #####       #####
 
@@ -37,6 +40,7 @@ PLAYLISTS=""
 icon=${3#*=}
 notify=${4#*=}
 ipc_path="/tmp/mpv-socket-$(date +%s)"
+np=${5#*=}
 
 ##### SETTING DEFAULT VALUES #####
 
@@ -48,6 +52,9 @@ if [ -z "$notify" ]; then
 fi
 if [ -z "$icon" ]; then
     icon="$HOME/Music/logo.png"
+fi
+if [ -z "$np" ]; then
+    np="$HOME/.config/hypr/scripts/notify_player.sh"
 fi
 if [ -z "$JSON_FILE" ]; then
     JSON_FILE="$HOME/Music/youtube_playlists.json"
@@ -115,7 +122,7 @@ YT(){
             echo ",{\"name\": \"$PLAYLIST_NAME\", \"url\": \"$1\"}]" >> temp.json
             mv temp.json "$JSON_FILE"
         fi
-        notify-send --app-name=$SCRIPT_NAME --icon=$HOME/Music/logo.png "Starting.."
+        notify-send --app-name=$SCRIPT_NAME --expire-time=1500 --icon=$HOME/Music/logo.png "Starting.."
         mpv --no-video --ytdl-format=bestaudio --ytdl-raw-options=yes-playlist= "$1" --title="$SCRIPT_NAME" --idle --input-ipc-server="$ipc_path" &
     else
         return 1
@@ -130,14 +137,12 @@ fi
 ##### YOUTUBE PLAYLIST DOWNLOAD #####
 
 YT_SAVE(){
-    notify-send --app-name=$SCRIPT_NAME --icon=$HOME/Music/logo.png "Downloading playlist..."
     PLAYLIST_NAME=$(yt-dlp --flat-playlist -e -j "$1" | sed -z 's/{.*//')
     dir=$HOME/Music/$(echo $PLAYLIST_NAME | cut -d' ' -f1)
     mkdir -p $dir
     cd $dir
-    yt-dlp -x --audio-format mp3 $1
+    yt-dlp -x --audio-format mp3 --output "%(title)s.%(ext)s" --exec "$np {}" "$1"
     SELECTED_PLAYLIST=$(echo $PLAYLIST_NAME | cut -d' ' -f1)
-    notify-send --app-name=$SCRIPT_NAME --icon=$HOME/Music/logo.png "Save completed"
 }
 
 if [ "$SELECTED_PLAYLIST" == "Save" ]; then
@@ -205,6 +210,9 @@ fi
 
 while [ -e "/proc/$!" ] && [ "$notify" ]; do
     current_file=$(echo '{ "command": ["get_property", "path"] }' | socat - "$ipc_path" | jq -r '.data')
+    if [ "$current_file" == null ]; then
+        continue
+    fi
     if [ "$current_file" != "$previous_file" ]; then
         metadata=$(echo '{ "command": ["get_property", "metadata"] }' | socat - "$ipc_path" | jq -r '.data')
         title=$(echo "$metadata" | jq -r '."title"')
@@ -225,12 +233,12 @@ while [ -e "/proc/$!" ] && [ "$notify" ]; do
             ffmpeg -i "$current_file" -an -codec:v copy /tmp/rofi_player_cover.jpg
             file_type=$(file --mime-type -b "/tmp/rofi_player_cover.jpg")
             if [[ $file_type == image/* ]]; then
-                notify-send --app-name="$artist" --icon=/tmp/rofi_player_cover.jpg "$title"
+                notify-send --app-name="$artist" --icon=/tmp/rofi_player_cover.jpg --expire-time=1500 "$title"
             else
-                notify-send --app-name="$artist" --icon="$icon" "$title"
+                notify-send --app-name="$artist" --icon="$icon" --expire-time=1500 "$title"
             fi
         else
-            notify-send --app-name="$artist" --icon="$icon" "$title"
+            notify-send --app-name="$artist" --icon="$icon" --expire-time=1500 "$title"
         fi
         previous_file=$current_file
     fi

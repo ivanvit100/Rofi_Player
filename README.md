@@ -26,8 +26,8 @@ It uses mpv to play music and mpv-mpris to support `MPRIS`.
 ## Flags
 1. `--offset` It allows you to set the indentation size to the number of songs in the directory
 2. `--json_file` Custom way to YT playlists JSON
-3. `--icon={{way}}` Custom way to notify-send icon
-4. `--notify{{boolean}}` Enable/disable notification
+3. `--icon` Custom way to notify-send icon
+4. `--notify` Enable/disable notification
 
 ## Using
 1. Make sure you have all dependensies installed.
